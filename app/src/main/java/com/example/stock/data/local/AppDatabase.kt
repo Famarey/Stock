@@ -1,0 +1,22 @@
+package com.example.stock.data.local
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+
+@Database(entities = [FavoriteStock::class], version = 1)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun stockDao(): StockDao
+
+    companion object {
+        @Volatile private var instance: AppDatabase? = null
+        fun getDatabase(context: Context): AppDatabase =
+            instance ?: synchronized(this) {
+                instance ?: Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java, "stock_db"
+                ).build().also { instance = it }
+            }
+    }
+}
