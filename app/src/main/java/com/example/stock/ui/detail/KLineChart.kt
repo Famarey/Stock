@@ -1,17 +1,22 @@
 package com.example.stock.ui.detail
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Card
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +48,9 @@ fun KLineChart(historicalPrices: List<HistoricalPrice>) {
             val maxPrice = prices.maxOf { it.high }
             val scrollState = rememberScrollState()
             
+            var selectedIndex by remember { mutableStateOf<Int?>(null) }
+            var touchPosition by remember { mutableStateOf<Offset?>(null) }
+            
             LaunchedEffect(Unit) {
                 scrollState.scrollTo(scrollState.maxValue)
             }
@@ -67,12 +75,39 @@ fun KLineChart(historicalPrices: List<HistoricalPrice>) {
                             modifier = Modifier
                                 .width((CANDLE_WIDTH + CANDLE_GAP) * prices.size)
                                 .height(200.dp)
+                                .pointerInput(Unit) {
+                                    forEachGesture {
+                                        awaitPointerEventScope {
+                                            val down = awaitFirstDown()
+                                            val x = down.position.x
+                                            val candleWidthPx = CANDLE_WIDTH.toPx()
+                                            val gapPx = CANDLE_GAP.toPx()
+                                            val totalWidth = candleWidthPx + gapPx
+                                            
+                                            val index = (x / totalWidth).toInt().coerceIn(0, prices.size - 1)
+                                            selectedIndex = index
+                                            touchPosition = down.position
+                                            
+                                            down.consume()
+                                        }
+                                    }
+                                }
                         ) {
                             drawKLines(
                                 historicalPrices = prices,
                                 minPrice = minPrice,
                                 maxPrice = maxPrice
                             )
+                            
+                            if (selectedIndex != null && touchPosition != null) {
+                                drawCrosshair(
+                                    prices = prices,
+                                    selectedIndex = selectedIndex!!,
+                                    touchPosition = touchPosition!!,
+                                    minPrice = minPrice,
+                                    maxPrice = maxPrice
+                                )
+                            }
                         }
                     }
                     
@@ -89,6 +124,58 @@ fun KLineChart(historicalPrices: List<HistoricalPrice>) {
                                 .height(24.dp)
                         ) {
                             SimpleDateLabels(prices = prices)
+                        }
+                    }
+                    
+                    if (selectedIndex != null) {
+                        val selectedPrice = prices[selectedIndex!!]
+                        val prevPrice = if (selectedIndex!! > 0) prices[selectedIndex!! - 1] else null
+                        val changePercent = if (prevPrice != null) {
+                            ((selectedPrice.close - prevPrice.close) / prevPrice.close) * 100
+                        } else {
+                            0.0
+                        }
+                        
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = selectedPrice.date,
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
+                                    Text(
+                                        text = "收盘价: $${String.format("%.2f", selectedPrice.close)}",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "最高: $${String.format("%.2f", selectedPrice.high)}",
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "最低: $${String.format("%.2f", selectedPrice.low)}",
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "涨跌幅: ${if (changePercent >= 0) "+" else ""}${String.format("%.2f", changePercent)}%",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (changePercent >= 0) Color(0xFF00C853) else Color.Red
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -188,4 +275,40 @@ private fun DrawScope.drawKLines(
             size = androidx.compose.ui.geometry.Size(candleWidth, (bottomY - topY).toFloat())
         )
     }
+}
+
+private fun DrawScope.drawCrosshair(
+    prices: List<HistoricalPrice>,
+    selectedIndex: Int,
+    touchPosition: Offset,
+    minPrice: Double,
+    maxPrice: Double
+) {
+    val priceRange = maxPrice - minPrice
+    if (priceRange <= 0) return
+    
+    val canvasHeight = size.height
+    val candleWidth = CANDLE_WIDTH.toPx()
+    val gap = CANDLE_GAP.toPx()
+    val totalWidth = candleWidth + gap
+    
+    val selectedPrice = prices[selectedIndex]
+    val x = selectedIndex * totalWidth + candleWidth / 2
+    val closeY = canvasHeight - ((selectedPrice.close - minPrice) / priceRange * canvasHeight).toFloat()
+    
+    val crosshairColor = Color.Gray.copy(alpha = 0.8f)
+    
+    drawLine(
+        color = crosshairColor,
+        start = Offset(x, 0f),
+        end = Offset(x, canvasHeight),
+        strokeWidth = 1.5f
+    )
+    
+    drawLine(
+        color = crosshairColor,
+        start = Offset(0f, closeY),
+        end = Offset(size.width, closeY),
+        strokeWidth = 1.5f
+    )
 }
