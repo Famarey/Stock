@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -30,6 +31,8 @@ import com.example.stock.data.local.AppDatabase
 import com.example.stock.data.local.StockDao
 import com.example.stock.ui.detail.DetailScreen
 import com.example.stock.ui.detail.DetailViewModel
+import com.example.stock.ui.news.NewsScreen
+import com.example.stock.ui.news.NewsViewModel
 import com.example.stock.ui.search.SearchScreen
 import com.example.stock.ui.search.SearchViewModel
 import com.example.stock.ui.theme.StockTheme
@@ -86,6 +89,7 @@ fun StockApp() {
     val detailViewModel: DetailViewModel = viewModel(
         factory = DetailViewModelFactory(database.stockDao())
     )
+    val newsViewModel: NewsViewModel = viewModel()
 
     if (selectedSymbol != null) {
         DetailScreen(
@@ -124,7 +128,7 @@ fun StockApp() {
                         onSelect = { symbol -> selectedSymbol = symbol } // 修改状态！
                     )
                 }
-                AppDestinations.PROFILE -> PlaceholderScreen("个人设置页面")
+                AppDestinations.NEWS -> NewsScreen(viewModel = newsViewModel)
             }
         }
     }
@@ -143,5 +147,5 @@ enum class AppDestinations(
 ) {
     HOME("行情", Icons.Default.Home),
     SEARCH("搜索", Icons.Default.Search),
-    PROFILE("我的", Icons.Default.Person),
+    NEWS("新闻", Icons.Default.Newspaper),
 }
